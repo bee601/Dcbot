@@ -1,4 +1,4 @@
-// Discord Account Creator - Full Automation + Snackoo
+// Discord Account Creator - Snackoo Edition (Full Automation + Snack Shop)
 class DiscordAccountCreator {
     constructor() {
         this.isRunning = false;
@@ -12,11 +12,143 @@ class DiscordAccountCreator {
         this.proxies = [];
         this.names = [];
         this.sessionId = null;
-        this.apiUrl = 'http://localhost:3000/api'; // Change to your backend URL
+        this.apiUrl = 'http://localhost:3000/api';
+        
+        // Snack system
+        this.snackCount = 0;
+        this.snackMultiplier = 1;
+        this.comboCounter = 0;
+        this.upgrades = { double: false, rainbow: false, mega: false, unlimited: false };
+        this.dailyClaimed = false;
+        this.loadSnackData();
+    }
+
+    loadSnackData() {
+        const saved = localStorage.getItem('snackooData');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                this.snackCount = data.snackCount || 0;
+                this.snackMultiplier = data.snackMultiplier || 1;
+                this.upgrades = data.upgrades || { double: false, rainbow: false, mega: false, unlimited: false };
+                this.dailyClaimed = data.dailyClaimed || false;
+            } catch(e) {}
+        }
+        this.updateSnackDisplay();
+    }
+
+    saveSnackData() {
+        localStorage.setItem('snackooData', JSON.stringify({
+            snackCount: this.snackCount,
+            snackMultiplier: this.snackMultiplier,
+            upgrades: this.upgrades,
+            dailyClaimed: this.dailyClaimed
+        }));
+    }
+
+    updateSnackDisplay() {
+        const counter = document.getElementById('snackCounter');
+        const progress = document.getElementById('snackProgress');
+        if (counter) counter.innerText = Math.floor(this.snackCount);
+        if (progress) {
+            const percent = Math.min((this.snackCount % 100) / 100 * 100, 100);
+            progress.style.width = `${percent}%`;
+        }
+    }
+
+    playCrunch() {
+        try {
+            const audio = document.getElementById('snackCrunch');
+            if (audio) audio.play().catch(() => {});
+            else {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 880;
+                gain.gain.value = 0.2;
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
+                osc.stop(ctx.currentTime + 0.3);
+            }
+        } catch(e) {}
+    }
+
+    awardSnacks(baseAmount, reason = 'Account erstellt') {
+        let amount = baseAmount * this.snackMultiplier;
+        
+        // Combo
+        this.comboCounter++;
+        if (this.comboCounter >= 3) {
+            let comboBonus = Math.floor(amount * 0.5);
+            amount += comboBonus;
+            this.log(`🔥 COMBO x${this.comboCounter}! +${comboBonus} Snacks!`, 'snackoo');
+        }
+        
+        // Rainbow
+        if (this.upgrades.rainbow && Math.random() < 0.3) {
+            let rainbowBonus = amount * 2;
+            amount += rainbowBonus;
+            this.log(`🌈 Regenbogen-Snack! +${rainbowBonus}`, 'snackoo');
+        }
+        
+        // Mega
+        if (this.upgrades.mega && Math.random() < 0.2) {
+            let megaBonus = amount * 3;
+            amount += megaBonus;
+            this.log(`💥 MEGA SNACKOO! +${megaBonus}`, 'snackoo');
+        }
+        
+        // Unlimited
+        if (this.upgrades.unlimited) {
+            amount = 999;
+            this.log(`♾️ UNENDLICH MODUS: +999 Snacks!`, 'snackoo');
+        }
+        
+        this.snackCount += amount;
+        this.saveSnackData();
+        this.updateSnackDisplay();
+        this.log(`🍪 +${amount} Snacks (${reason}) | Multi: ${this.snackMultiplier}x | Total: ${Math.floor(this.snackCount)}`, 'snackoo');
+        this.showSnackooAnimation(amount);
+        this.playCrunch();
+        return amount;
+    }
+
+    showSnackooAnimation(amount) {
+        let burstCount = Math.min(Math.floor(amount / 5) + 1, 30);
+        for (let b = 0; b < burstCount; b++) {
+            setTimeout(() => {
+                for (let i = 0; i < 20; i++) {
+                    let conf = document.createElement('div');
+                    conf.style.position = 'fixed';
+                    conf.style.width = `${Math.random() * 12 + 4}px`;
+                    conf.style.height = `${Math.random() * 12 + 4}px`;
+                    conf.style.background = `hsl(${Math.random() * 360}, 100%, 60%)`;
+                    conf.style.left = Math.random() * window.innerWidth + 'px';
+                    conf.style.top = '-30px';
+                    conf.style.borderRadius = '50%';
+                    conf.style.pointerEvents = 'none';
+                    conf.style.zIndex = '9999';
+                    conf.style.animation = `fall ${Math.random() * 2 + 1}s linear forwards`;
+                    document.body.appendChild(conf);
+                    setTimeout(() => conf.remove(), 3000);
+                }
+            }, b * 150);
+        }
+        
+        let popup = document.createElement('div');
+        popup.innerHTML = `
+            <div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:radial-gradient(circle, #ffcc44, #ff8844); color:#fff; padding:20px 40px; border-radius:80px; font-size:2rem; font-weight:bold; z-index:10000; box-shadow:0 0 80px orange; text-align:center; animation:bounce 0.4s;">
+                🍪 +${amount} SNACKOO! 🍪<br><small>Gesamt: ${Math.floor(this.snackCount)}</small>
+            </div>`;
+        document.body.appendChild(popup);
+        setTimeout(() => popup.remove(), 2000);
     }
 
     log(message, type = 'info') {
         const consoleOutput = document.getElementById('consoleOutput');
+        if (!consoleOutput) return;
         const timestamp = new Date().toLocaleTimeString();
         let color = '#ffffff';
         switch(type) {
@@ -27,93 +159,46 @@ class DiscordAccountCreator {
             case 'system': color = '#99aab5'; break;
             case 'snackoo': color = '#ffaa44'; break;
         }
-        const logEntry = `<span style="color: ${color}">[${timestamp}] ${message}</span><br>`;
-        consoleOutput.innerHTML += logEntry;
+        consoleOutput.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span><br>`;
         consoleOutput.scrollTop = consoleOutput.scrollHeight;
     }
 
-    showSnackoo() {
-        // Snackoo reward – visual + audio celebration
-        const snackooDiv = document.createElement('div');
-        snackooDiv.innerHTML = `
-            <div id="snackooOverlay" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); 
-                background:linear-gradient(135deg,#ffaa44,#ff6644); color:white; padding:20px 40px; 
-                border-radius:50px; font-size:2rem; font-weight:bold; z-index:10000; 
-                box-shadow:0 0 50px rgba(0,0,0,0.5); text-align:center; animation:bounce 0.5s;">
-                🍪 SNACKOO ERHALTEN! 🍪<br>
-                <small style="font-size:1rem;">+1 Cookie für dich!</small>
-            </div>
-            <style>
-                @keyframes bounce {
-                    0% { transform: translate(-50%,-50%) scale(0.3); opacity:0; }
-                    50% { transform: translate(-50%,-50%) scale(1.2); }
-                    100% { transform: translate(-50%,-50%) scale(1); opacity:1; }
-                }
-            </style>
-        `;
-        document.body.appendChild(snackooDiv);
-        
-        // Play snackoo sound (simulated beep)
-        const audio = new Audio('data:audio/wav;base64,U3RlYWx0aCBzb3VuZCBzaW11bGF0aW9u'); // dummy
-        audio.play().catch(() => {});
-        
-        // Confetti effect
-        for(let i = 0; i < 100; i++) {
-            const conf = document.createElement('div');
-            conf.style.position = 'fixed';
-            conf.style.width = '10px';
-            conf.style.height = '10px';
-            conf.style.background = `hsl(${Math.random()*360}, 100%, 50%)`;
-            conf.style.left = Math.random() * window.innerWidth + 'px';
-            conf.style.top = '-20px';
-            conf.style.pointerEvents = 'none';
-            conf.style.zIndex = '9999';
-            conf.style.animation = `fall ${Math.random() * 2 + 1}s linear forwards`;
-            document.body.appendChild(conf);
-            setTimeout(() => conf.remove(), 3000);
-        }
-        
-        setTimeout(() => snackooDiv.remove(), 3000);
-        
-        this.log('🍪 SNACKOO freigeschaltet! Du bekommst einen Snack!', 'snackoo');
-    }
-
     updateProgress() {
-        const progress = Math.round((this.currentAccount / this.totalAccounts) * 100);
-        document.getElementById('progressBar').style.width = `${progress}%`;
-        document.getElementById('progressText').textContent = `${this.currentAccount}/${this.totalAccounts}`;
-        document.getElementById('stats').textContent = `Erfolgreich: ${this.createdAccounts.length}`;
-        document.getElementById('statsFailed').textContent = `Fehlerhaft: ${this.failedAccounts}`;
+        let percent = Math.round((this.currentAccount / this.totalAccounts) * 100);
+        let progressBar = document.getElementById('progressBar');
+        let progressText = document.getElementById('progressText');
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressText) progressText.textContent = `${this.currentAccount}/${this.totalAccounts}`;
+        let statsElem = document.getElementById('stats');
+        let failedElem = document.getElementById('statsFailed');
+        if (statsElem) statsElem.textContent = `Erfolgreich: ${this.createdAccounts.length}`;
+        if (failedElem) failedElem.textContent = `Fehlerhaft: ${this.failedAccounts}`;
     }
 
     addAccountToList(account) {
-        const accountsList = document.getElementById('accountsList');
-        if (accountsList.firstChild?.className === 'text-muted text-center') {
-            accountsList.innerHTML = '';
-        }
-        const accountItem = document.createElement('div');
-        accountItem.className = 'account-item';
-        accountItem.innerHTML = `
+        let accountsList = document.getElementById('accountsList');
+        if (!accountsList) return;
+        if (accountsList.firstChild?.className === 'text-muted text-center') accountsList.innerHTML = '';
+        let item = document.createElement('div');
+        item.className = 'account-item';
+        item.innerHTML = `
             <strong>Account #${account.number}</strong><br>
             <small>Email: ${account.email}</small><br>
             <small>Username: ${account.username}</small><br>
             <small>Passwort: ${account.password}</small><br>
             <small class="text-muted">Server beigetreten: ${account.joinedServer ? '✅ Ja' : '❌ Nein'}</small>
         `;
-        accountsList.prepend(accountItem);
+        accountsList.prepend(item);
     }
 
     async start() {
-        if (this.isRunning) {
-            this.log('Creator läuft bereits', 'warning');
-            return;
-        }
+        if (this.isRunning) { this.log('Creator läuft bereits', 'warning'); return; }
         
         this.inviteLink = document.getElementById('inviteLink').value.trim();
         this.totalAccounts = parseInt(document.getElementById('accountCount').value);
         this.delaySeconds = parseInt(document.getElementById('delaySeconds').value);
-        const proxyText = document.getElementById('proxyList').value.trim();
-        const nameText = document.getElementById('nameList').value.trim();
+        let proxyText = document.getElementById('proxyList').value.trim();
+        let nameText = document.getElementById('nameList').value.trim();
         this.proxies = proxyText ? proxyText.split('\n').filter(p => p.trim()) : [];
         this.names = nameText ? nameText.split('\n').filter(n => n.trim()) : [];
         
@@ -127,13 +212,13 @@ class DiscordAccountCreator {
         this.currentAccount = 0;
         this.createdAccounts = [];
         this.failedAccounts = 0;
+        this.comboCounter = 0;
         
-        this.log('=== Starte echte Discord Automation mit Login & Server Join ===', 'system');
+        this.log('=== Starte Discord Automation mit Snackoo ===', 'system');
         this.log(`Server: ${this.inviteLink}`, 'info');
         
-        // Call backend real automation
         try {
-            const response = await fetch(`${this.apiUrl}/create`, {
+            let response = await fetch(`${this.apiUrl}/create`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -144,27 +229,30 @@ class DiscordAccountCreator {
                     names: this.names.join('\n')
                 })
             });
-            const data = await response.json();
-            
+            let data = await response.json();
             if (data.accounts) {
-                this.totalAccounts = data.accounts.length;
                 for (let acc of data.accounts) {
+                    if (!this.isRunning) break;
+                    while (this.isPaused) await new Promise(r => setTimeout(r, 500));
                     this.currentAccount++;
                     if (acc.success) {
+                        let snackAmount = (acc.snackReward || 10) + (acc.snackBonus ? 15 : 0);
+                        if (acc.snackBonus) this.log(`✨ ${acc.snackBonus}! +15 Extra Snacks!`, 'snackoo');
                         this.createdAccounts.push(acc);
                         this.addAccountToList(acc);
-                        this.log(`✓ Account ${acc.username} (${acc.email}) erstellt und Server beigetreten`, 'success');
-                        // SNACKOO for every successful account
-                        this.showSnackoo();
+                        this.log(`✓ Account ${acc.username} (${acc.email}) erstellt & beigetreten`, 'success');
+                        this.awardSnacks(snackAmount, `Account ${acc.username}`);
                     } else {
                         this.failedAccounts++;
                         this.log(`✗ Account #${acc.number} fehlgeschlagen: ${acc.error || 'Unbekannt'}`, 'error');
                     }
                     this.updateProgress();
+                    if (this.delaySeconds > 0 && this.currentAccount < this.totalAccounts)
+                        await new Promise(r => setTimeout(r, this.delaySeconds * 1000));
                 }
                 this.finish();
             }
-        } catch (err) {
+        } catch(err) {
             this.log(`Backend Fehler: ${err.message}`, 'error');
             this.isRunning = false;
         }
@@ -173,21 +261,83 @@ class DiscordAccountCreator {
     finish() {
         this.isRunning = false;
         this.log('=== Prozess abgeschlossen ===', 'system');
-        this.log(`${this.createdAccounts.length} erfolgreiche Accounts, ${this.failedAccounts} fehlgeschlagen`, 
-                 this.createdAccounts.length > 0 ? 'success' : 'error');
-        if(this.createdAccounts.length > 0) {
-            this.log('🎉 SNACKOO wurde dir gutgeschrieben! 🎉', 'snackoo');
-        }
+        this.log(`${this.createdAccounts.length} erfolgreich, ${this.failedAccounts} fehlgeschlagen`, this.createdAccounts.length ? 'success' : 'error');
+        if (this.createdAccounts.length) this.awardSnacks(50, 'Abschlussbonus');
     }
 
-    pauseResume() { this.log('Pause/Resume in Vollautomatik nicht nötig', 'warning'); }
-    stop() { this.isRunning = false; this.log('Prozess gestoppt', 'error'); }
+    pauseResume() { 
+        if (!this.isRunning) return;
+        this.isPaused = !this.isPaused;
+        this.log(this.isPaused ? '⏸️ Pausiert' : '▶️ Fortgesetzt', 'warning');
+        if (!this.isPaused) this.start(); 
+    }
+    
+    stop() { 
+        this.isRunning = false; 
+        this.isPaused = false;
+        this.log('🛑 Gestoppt', 'error');
+    }
 }
 
-const creator = new DiscordAccountCreator();
+let creator = new DiscordAccountCreator();
 
-function startCreation() { creator.start(); }
-function pauseResume() { creator.pauseResume(); }
-function stopCreation() { creator.stop(); }
-function clearConsole() { document.getElementById('consoleOutput').innerHTML = '<span style="color:#7289da;">=== Discord Account Creator ===</span><br><span style="color:#43b581;">Console gelöscht...</span>'; }
-function exportAccounts() { /* existing export code */ }
+// Globale Funktionen
+function clearConsole() {
+    let el = document.getElementById('consoleOutput');
+    if (el) el.innerHTML = '<span style="color: #7289da;">=== Discord Account Creator ===</span><br><span style="color: #43b581;">Console gelöscht...</span>';
+}
+
+function exportAccounts() {
+    if (!creator.createdAccounts.length) { alert('Keine Accounts zum Exportieren'); return; }
+    let text = `Discord Accounts Export - ${new Date()}\nServer: ${creator.inviteLink}\n${'='.repeat(50)}\n`;
+    creator.createdAccounts.forEach(acc => {
+        text += `#${acc.number}\n  Email: ${acc.email}\n  User: ${acc.username}\n  Pass: ${acc.password}\n  Joined: ${acc.joinedServer}\n${'-'.repeat(30)}\n`;
+    });
+    let blob = new Blob([text], {type: 'text/plain'});
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `discord_snackoo_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    creator.log('Accounts exportiert', 'success');
+}
+
+function openSnackShop() {
+    let modal = new bootstrap.Modal(document.getElementById('snackShopModal'));
+    modal.show();
+}
+
+function claimDailySnack() {
+    let last = localStorage.getItem('lastDailySnack');
+    let today = new Date().toDateString();
+    if (last === today) {
+        creator.log('Heute schon Tages-Snack geholt! Morgen wieder.', 'warning');
+        return;
+    }
+    localStorage.setItem('lastDailySnack', today);
+    creator.awardSnacks(25, 'Täglicher Snack');
+}
+
+function buySnackUpgrade(type) {
+    let costs = { double: 50, rainbow: 100, mega: 200, unlimited: 500 };
+    let cost = costs[type];
+    if (creator.snackCount < cost) {
+        creator.log(`Nicht genug Snacks! Benötigt ${cost} Snacks.`, 'error');
+        return;
+    }
+    creator.snackCount -= cost;
+    if (type === 'double') { creator.snackMultiplier = 2; creator.upgrades.double = true; creator.log('🍪 Doppelte Snacks aktiviert!', 'success'); }
+    if (type === 'rainbow') { creator.upgrades.rainbow = true; creator.log('🌈 Regenbogen-Snack aktiviert!', 'success'); }
+    if (type === 'mega') { creator.upgrades.mega = true; creator.log('💥 Mega Snackoo aktiviert!', 'success'); }
+    if (type === 'unlimited') { creator.snackMultiplier = 999; creator.upgrades.unlimited = true; creator.log('♾️ UNENDLICH SNACKS MODUS!', 'snackoo'); }
+    creator.saveSnackData();
+    creator.updateSnackDisplay();
+    bootstrap.Modal.getInstance(document.getElementById('snackShopModal')).hide();
+}
+
+window.onload = () => {
+    if (document.getElementById('nameList')) {
+        document.getElementById('nameList').value = ['SnackoMaster', 'CookieHunter', 'CrunchTime', 'DiscordSnack'].join('\n');
+    }
+    creator.log('🍪 Snackoo Edition geladen – Los geht\'s mit den Snacks!', 'snackoo');
+};
