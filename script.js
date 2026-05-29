@@ -1,4 +1,4 @@
-// Discord Account Creator - Snackoo Edition (Full Automation + Snack Shop)
+// Discord Account Creator - Snackoo Edition (Fixed Backend Connection)
 class DiscordAccountCreator {
     constructor() {
         this.isRunning = false;
@@ -11,8 +11,11 @@ class DiscordAccountCreator {
         this.inviteLink = '';
         this.proxies = [];
         this.names = [];
-        this.sessionId = null;
-        this.apiUrl = 'http://localhost:3000/api';
+        
+        // Try multiple backend ports
+        this.backendPorts = [5000, 3000];
+        this.activePort = null;
+        this.backendReady = false;
         
         // Snack system
         this.snackCount = 0;
@@ -21,6 +24,34 @@ class DiscordAccountCreator {
         this.upgrades = { double: false, rainbow: false, mega: false, unlimited: false };
         this.dailyClaimed = false;
         this.loadSnackData();
+        
+        // Auto-detect backend on startup
+        this.detectBackend();
+    }
+
+    async detectBackend() {
+        for (let port of this.backendPorts) {
+            try {
+                const response = await fetch(`http://localhost:${port}/api/status`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    this.activePort = port;
+                    this.backendReady = true;
+                    this.log(`✅ Backend verbunden auf Port ${port}`, 'success');
+                    return;
+                }
+            } catch(e) {
+                // continue to next port
+            }
+        }
+        this.log(`❌ Kein Backend gefunden. Starte backend.py mit "python backend.py" auf Port 5000`, 'error');
+        this.log(`   Oder starte server.js mit "node server.js" auf Port 3000`, 'error');
+    }
+
+    get apiUrl() {
+        return this.activePort ? `http://localhost:${this.activePort}/api` : 'http://localhost:5000/api';
     }
 
     loadSnackData() {
@@ -60,47 +91,30 @@ class DiscordAccountCreator {
         try {
             const audio = document.getElementById('snackCrunch');
             if (audio) audio.play().catch(() => {});
-            else {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = 880;
-                gain.gain.value = 0.2;
-                osc.start();
-                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
-                osc.stop(ctx.currentTime + 0.3);
-            }
         } catch(e) {}
     }
 
     awardSnacks(baseAmount, reason = 'Account erstellt') {
         let amount = baseAmount * this.snackMultiplier;
         
-        // Combo
-        this.comboCounter++;
         if (this.comboCounter >= 3) {
             let comboBonus = Math.floor(amount * 0.5);
             amount += comboBonus;
             this.log(`🔥 COMBO x${this.comboCounter}! +${comboBonus} Snacks!`, 'snackoo');
         }
         
-        // Rainbow
         if (this.upgrades.rainbow && Math.random() < 0.3) {
             let rainbowBonus = amount * 2;
             amount += rainbowBonus;
             this.log(`🌈 Regenbogen-Snack! +${rainbowBonus}`, 'snackoo');
         }
         
-        // Mega
         if (this.upgrades.mega && Math.random() < 0.2) {
             let megaBonus = amount * 3;
             amount += megaBonus;
             this.log(`💥 MEGA SNACKOO! +${megaBonus}`, 'snackoo');
         }
         
-        // Unlimited
         if (this.upgrades.unlimited) {
             amount = 999;
             this.log(`♾️ UNENDLICH MODUS: +999 Snacks!`, 'snackoo');
@@ -194,6 +208,15 @@ class DiscordAccountCreator {
     async start() {
         if (this.isRunning) { this.log('Creator läuft bereits', 'warning'); return; }
         
+        if (!this.backendReady) {
+            this.log('Warte auf Backend-Verbindung...', 'warning');
+            await this.detectBackend();
+            if (!this.backendReady) {
+                this.log('❌ Kein Backend erreichbar. Starte backend.py mit "python backend.py"', 'error');
+                return;
+            }
+        }
+        
         this.inviteLink = document.getElementById('inviteLink').value.trim();
         this.totalAccounts = parseInt(document.getElementById('accountCount').value);
         this.delaySeconds = parseInt(document.getElementById('delaySeconds').value);
@@ -216,6 +239,7 @@ class DiscordAccountCreator {
         
         this.log('=== Starte Discord Automation mit Snackoo ===', 'system');
         this.log(`Server: ${this.inviteLink}`, 'info');
+        this.log(`Backend URL: ${this.apiUrl}`, 'info');
         
         try {
             let response = await fetch(`${this.apiUrl}/create`, {
@@ -229,7 +253,14 @@ class DiscordAccountCreator {
                     names: this.names.join('\n')
                 })
             });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             let data = await response.json();
+            this.log(`Backend antwortet: ${data.total || 0} Accounts verarbeitet`, 'success');
+            
             if (data.accounts) {
                 for (let acc of data.accounts) {
                     if (!this.isRunning) break;
@@ -245,15 +276,19 @@ class DiscordAccountCreator {
                     } else {
                         this.failedAccounts++;
                         this.log(`✗ Account #${acc.number} fehlgeschlagen: ${acc.error || 'Unbekannt'}`, 'error');
+                        this.awardSnacks(5, 'Trost-Snack');
                     }
                     this.updateProgress();
                     if (this.delaySeconds > 0 && this.currentAccount < this.totalAccounts)
                         await new Promise(r => setTimeout(r, this.delaySeconds * 1000));
                 }
                 this.finish();
+            } else {
+                throw new Error('Ungültige Antwort vom Backend');
             }
         } catch(err) {
             this.log(`Backend Fehler: ${err.message}`, 'error');
+            this.log(`Stelle sicher, dass backend.py läuft: python backend.py`, 'warning');
             this.isRunning = false;
         }
     }
@@ -339,5 +374,6 @@ window.onload = () => {
     if (document.getElementById('nameList')) {
         document.getElementById('nameList').value = ['SnackoMaster', 'CookieHunter', 'CrunchTime', 'DiscordSnack'].join('\n');
     }
-    creator.log('🍪 Snackoo Edition geladen – Los geht\'s mit den Snacks!', 'snackoo');
+    creator.log('🍪 Snackoo Edition geladen – Suche nach Backend...', 'snackoo');
+    creator.detectBackend();
 };
