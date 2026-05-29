@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Account Creator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-top: 20px;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: none;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: linear-gradient(45deg, #7289da, #5a6fbb);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #7289da, #5a6fbb);
+            border: none;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(114, 137, 218, 0.4);
+        }
+        .console-output {
+            background-color: #1e1e1e;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            height: 400px;
+            overflow-y: auto;
+            border-radius: 10px;
+            padding: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .account-item {
+            background: rgba(114, 137, 218, 0.1);
+            border-left: 4px solid #7289da;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+        }
+        .progress-bar {
+            background: linear-gradient(45deg, #7289da, #5a6fbb);
+        }
+        .badge-success {
+            background-color: #43b581;
+        }
+        .badge-danger {
+            background-color: #f04747;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <!-- Header -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="mb-0"><i class="fab fa-discord me-2"></i>Discord Account Creator</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0">Erstelle automatisch Discord Accounts und lasse sie einem Server beitreten.</p>
+                    </div>
+                </div>
+
+                <!-- Control Panel -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Einstellungen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Discord Einladungslink:</label>
+                                <input type="text" class="form-control" id="inviteLink" 
+                                       placeholder="https://discord.gg/xxxxxx" 
+                                       value="https://discord.gg/example">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Anzahl Accounts:</label>
+                                <input type="number" class="form-control" id="accountCount" 
+                                       min="1" max="100" value="5">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Delay (Sekunden):</label>
+                                <input type="number" class="form-control" id="delaySeconds" 
+                                       min="1" max="60" value="10">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Proxy-Liste (optional):</label>
+                                <textarea class="form-control" id="proxyList" rows="3" 
+                                          placeholder="proxy1:port&#10;proxy2:port&#10;..."></textarea>
+                                <small class="form-text text-muted">Ein Proxy pro Zeile</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Namen-Liste (optional):</label>
+                                <textarea class="form-control" id="nameList" rows="3" 
+                                          placeholder="Max Müller&#10;Anna Schmidt&#10;..."></textarea>
+                                <small class="form-text text-muted">Ein Name pro Zeile</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="card mb-4">
+                    <div class="card-body text-center">
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <button class="btn btn-primary w-100" onclick="startCreation()">
+                                    <i class="fas fa-play me-2"></i>Start Creation
+                                </button>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <button class="btn btn-warning w-100" onclick="pauseResume()">
+                                    <i class="fas fa-pause me-2"></i>Pause/Resume
+                                </button>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <button class="btn btn-danger w-100" onclick="stopCreation()">
+                                    <i class="fas fa-stop me-2"></i>Stop
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Fortschritt:</span>
+                                <span id="progressText">0/0</span>
+                            </div>
+                            <div class="progress" style="height: 20px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Console Output -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-terminal me-2"></i>Console Output</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="console-output" id="consoleOutput">
+<span style="color: #7289da;">=== Discord Account Creator ===</span>
+<span style="color: #43b581;">Bereit zur Ausführung...</span>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearConsole()">
+                                <i class="fas fa-trash me-1"></i>Clear Console
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="exportAccounts()">
+                                <i class="fas fa-download me-1"></i>Export Accounts
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Created Accounts -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Erstellte Accounts</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="accountsList">
+                            <p class="text-muted text-center">Noch keine Accounts erstellt</p>
+                        </div>
+                        <div class="mt-3 text-center">
+                            <span id="stats" class="badge bg-success me-2">Erfolgreich: 0</span>
+                            <span id="statsFailed" class="badge bg-danger">Fehlerhaft: 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="text-center mt-4 mb-4">
+                    <p class="text-white">Discord Account Creator v1.0 | Für Bildungszwecke</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
